@@ -129,6 +129,7 @@ steps:
 
 - task: PublishTestResults@2
   displayName: 'Publish Test Results'
+
 - task: DotNetCoreCLI@2
   displayName: 'Publish Project - $(buildConfiguration)'
   inputs:
@@ -137,5 +138,8 @@ steps:
     zipAfterPublish: true
 
 - task: PublishBuildArtifacts@1
-  displayName: 'Publish Artifact: drop'
+  displayName: 'Publish Artifact: WebApp'
+  inputs:
+    PathToPublish: '$(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
+    ArtifactName: WebApp
   condition: succeeded()
