@@ -85,6 +85,14 @@ steps:
     command: custom
     custom: tool
     arguments: 'install --global dotnet-reportgenerator-globaltool'
+  condition: |
+    and
+    (
+      succeeded(),
+      eq(variables['BuildReason'],'PullRequest'),
+      eq(variables['System.PullRequest.TargetBranch'],'master')
+    )
+
 
 - task: DotNetCoreCLI@2
   displayName: 'Run unit tests - $(buildConfiguration)'
@@ -93,11 +101,25 @@ steps:
     arguments: '--no-build --configuration $(buildConfiguration) /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=$(Build.SourcesDirectory)/TestResults/Coverage/'
     publishTestResults: Test
     projects: '**/*.Tests.csproj'
+  condition: |
+    and
+    (
+      succeeded(),
+      eq(variables['BuildReason'],'PullRequest'),
+      eq(variables['System.PullRequest.TargetBranch'],'master')
+    )
 
 - script: |
     reportgenerator -reports:$(Build.SourcesDirectory)/**/coverage.cobertura.xml -targetdir:$(Build.SourcesDirectory)/CodeCoverage -reporttypes:HtmlInline_AzurePipelines
   displayName: 'Create code coverage report'
-
+  condition: |
+    and
+    (
+      succeeded(),
+      eq(variables['BuildReason'],'PullRequest'),
+      eq(variables['System.PullRequest.TargetBranch'],'master')
+    )
+    
 - task: SonarCloudAnalyze@1
   displayName: 'Run SonarCloud code analysis'
   condition: |
@@ -123,9 +145,23 @@ steps:
   inputs: 
     codeCoverageTool: 'cobertura'
     summaryFileLocation: '$(Build.SourcesDirectory)/**/coverage.cobertura.xml'
+  condition: |
+    and
+    (
+      succeeded(),
+      eq(variables['BuildReason'],'PullRequest'),
+      eq(variables['System.PullRequest.TargetBranch'],'master')
+    )
 
 - task: WhiteSource Bolt@20
   displayName: 'Scan for open source'
+  condition: |
+    and
+    (
+      succeeded(),
+      eq(variables['BuildReason'],'PullRequest'),
+      eq(variables['System.PullRequest.TargetBranch'],'master')
+    )
 
 - task: PublishTestResults@2
   displayName: 'Publish Test Results'
@@ -134,7 +170,7 @@ steps:
   displayName: 'Publish Project - $(buildConfiguration)'
   inputs:
     command: publish
-    arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory/$(buildConfiguration)'
+    arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
     zipAfterPublish: true
 
 - task: PublishBuildArtifacts@1
