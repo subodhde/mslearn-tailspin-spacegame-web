@@ -1,181 +1,69 @@
-trigger: 
-- 'security-scan'
-
-pool:
-  vmImage: 'ubuntu-16.04'
-  demanns:
-    - npm
+trigger:
+- 'release-pipeline'
 
 variables:
   buildConfiguration: 'Release'
-  wwwrootdir: 'Tailspin.SpaceGame.Web/wwwroot'  
-  dotnetSdkVersion: '3.1.100'
 
-steps:
-
-- task: UseDotNet@2
-  displayName: Use DotNet Core Version $(dotnetSdkVersion)
-  inputs: 
-    version: '$(dotnetSdkVersion)'
-
-- task: UseDotNet@2
-  displayName: 'User .Net Core SDK 2.1.505 for SonarCloud'
-  inputs:
-    version: '2.1.505'
-
-- task: Npm@1
-  displayName: 'Run NPN Install'
-  inputs:
-    verbose: false
-
-- script: './node_modules/.bin/node-sass $(wwwrootDir) --output $(wwwrootDir)'
-  displayName: 'Compile Sass assets'
-
-- task: gulp@1
-  displayName: 'Run gulp tasks'
-
-- script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
-  displayName: 'Write build info'
-  workingDirectory: $(wwwrootDir)
-
-#- task: DotNetCoreCLI@2
-#  displayName: 'Build project - $(buildConfiguration)'
-#  inputs:
-#    command: 'restore'
-#    projects: '**/*.csproj'
-
-- task: NuGetCommand@2
-  displayName: Restore Dependencies from Azure Artifacts
-  inputs:
-    command: restore
-    restoreSolution: '**/*.sln'
-    feedstoUse: 'Select'
-    vstsFeed: 'Space Game - web - Dependencies/Tailspin.SpaceGame.Web.Models'
-
-- task: SonarCloudPrepare@1
-  displayName: 'Prepare SonarCloud analysis'
-  inputs:
-    SonarCloud: 'SonarCloud connection 1'
-    organization: '$(SonarOrganization)'
-    scannerMode: 'MSBuild'
-    projectKey: '$(SonarProjectKey)'
-    projectName: '$(SonarProjectName)'
-    projectVersion: '$(Build.BuildNumber)'
-    extraProperties: |
-     sonar.cs.opencover.reportsPaths=$(Build.SourcesDirectory)/TestResults/Coverage/coverage.opencover.xml
-     sonar.exclusions=**/wwwroot/lib/**/*
-  condition: |
-    and
-    (
-      succeeded(),
-      eq(variables['BuildReason'],'PullRequest'),
-      eq(variables['System.PullRequest.TargetBranch'],'master')
-    )
-  
-- task: DotNetCoreCLI@2
-  displayName: 'Build project - $(buildConfiguration)'
-  inputs:
-    command: 'build'
-    arguments: '--no-restore --configuration $(buildConfiguration)'
-    projects: '**/*.csproj'
-
-- task: DotNetCoreCLI@2
-  displayName: 'Install Report Generator'
-  inputs:
-    command: custom
-    custom: tool
-    arguments: 'install --global dotnet-reportgenerator-globaltool'
-  condition: |
-    and
-    (
-      succeeded(),
-      eq(variables['BuildReason'],'PullRequest'),
-      eq(variables['System.PullRequest.TargetBranch'],'master')
-    )
-
-
-- task: DotNetCoreCLI@2
-  displayName: 'Run unit tests - $(buildConfiguration)'
-  inputs:
-    command: 'test'
-    arguments: '--no-build --configuration $(buildConfiguration) /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=$(Build.SourcesDirectory)/TestResults/Coverage/'
-    publishTestResults: Test
-    projects: '**/*.Tests.csproj'
-  condition: |
-    and
-    (
-      succeeded(),
-      eq(variables['BuildReason'],'PullRequest'),
-      eq(variables['System.PullRequest.TargetBranch'],'master')
-    )
-
-- script: |
-    reportgenerator -reports:$(Build.SourcesDirectory)/**/coverage.cobertura.xml -targetdir:$(Build.SourcesDirectory)/CodeCoverage -reporttypes:HtmlInline_AzurePipelines
-  displayName: 'Create code coverage report'
-  condition: |
-    and
-    (
-      succeeded(),
-      eq(variables['BuildReason'],'PullRequest'),
-      eq(variables['System.PullRequest.TargetBranch'],'master')
-    )
+stages:
+- stage: 'Build'
+  displayName: 'Build Web App'
+  jobs:
+  - job: 'Build'
+    displayName: 'Build Job'
+    pool:
+      vmImage: 'ubuntu-18.04'
+      demands:
+      - npm
     
-- task: SonarCloudAnalyze@1
-  displayName: 'Run SonarCloud code analysis'
-  condition: |
-    and
-    (
-      succeeded(),
-      eq(variables['BuildReason'],'PullRequest'),
-      eq(variables['System.PullRequest.TargetBranch'],'master')
-    )
+    variables:
+      wwwrootDir: 'Tailspin.SpaceGame.Web/wwwroot'
+      dotnetSdkVersion: '3.1.300'
 
-- task: SonarCloudPublish@1
-  displayName: 'Publish SonarCloud quality gate results'
-  condition: |
-    and
-    (
-      succeeded(),
-      eq(variables['BuildReason'],'PullRequest'),
-      eq(variables['System.PullRequest.TargetBranch'],'master')
-    )
-  
-- task: PublishCodeCoverageResults@1
-  displayName: 'Publish code coverage report'
-  inputs: 
-    codeCoverageTool: 'cobertura'
-    summaryFileLocation: '$(Build.SourcesDirectory)/**/coverage.cobertura.xml'
-  condition: |
-    and
-    (
-      succeeded(),
-      eq(variables['BuildReason'],'PullRequest'),
-      eq(variables['System.PullRequest.TargetBranch'],'master')
-    )
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Use .Net Version $(otnetSdkVersion)' 
+      inputs:
+        version: $(dotnetSdkversion)
 
-- task: WhiteSource Bolt@20
-  displayName: 'Scan for open source'
-  condition: |
-    and
-    (
-      succeeded(),
-      eq(variables['BuildReason'],'PullRequest'),
-      eq(variables['System.PullRequest.TargetBranch'],'master')
-    )
+    - task: Npm@1
+      displayName: 'Run npn install'
+      inputs:
+        verbose: false
 
-- task: PublishTestResults@2
-  displayName: 'Publish Test Results'
+    - script: './node_modules/.bin/node-sass $(wwwrootDir) --output $(wwwrootDir)'
+      displayName: 'Compile Sass assets'
 
-- task: DotNetCoreCLI@2
-  displayName: 'Publish Project - $(buildConfiguration)'
-  inputs:
-    command: publish
-    arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
-    zipAfterPublish: true
+    - task: gulp@1
+      displayName: 'Run gulp task'
 
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish Artifact: WebApp'
-  inputs:
-    PathToPublish: '$(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
-    ArtifactName: WebApp
-  condition: succeeded()
+    - script: 'echo "$(Build.DefinitionName), $(Build.BuildId),$(Build.BuildNumber)" > buildinfo.txt'
+      displayName: 'Write build info'
+      workingDirectory: $(wwwrootDir)
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore Dependencies'
+      inputs: 
+        command: 'restore'
+        projects: '**/*.csproj'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build Project - $(buildConfiguration)'
+      inputs:
+        command: 'build'
+        arguements: '--no-restore --configuration $(buildConfiguration'
+        projects: '**/*.csproj'
+
+    - task: DotNetCLiCore@2
+      displayName: 'Publish the Project'
+      inputs: 
+        command: 'publish'
+        projects: '**/*.csproj'
+        publishWebProjects: false
+        arguements: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
+        zipAfterPublish: true
+
+    - task: PublishBuildArtifact@1
+      displayName: 'Publish Artifact at location "$(Build.ArtifactStagingDirectory)/$(buildConfiguration)"'
+      inputs: 
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
+        artifactName: 'WebApp'
